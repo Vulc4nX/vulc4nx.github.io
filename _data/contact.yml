@@ -11,9 +11,9 @@
   icon: "fas fa-envelope"
   noblank: true # open link in current tab
 
-- type: cv
-  icon: "fas fa-file-alt"
-  url:  '/cv.pdf/'
+#- type: cv
+#  icon: "fas fa-file-alt"
+#  url:  '/cv.pdf/'
 # Uncomment and complete the url below to enable more contact options
 #
 # - type: mastodon
