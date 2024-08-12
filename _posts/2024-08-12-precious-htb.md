@@ -7,9 +7,7 @@ img_path: /assets/img/htb/precious/
 image: /assets/img/htb/precious/precious.png
 ---
 
-![precious](/assets/img/htb/precious/precious.png)
-
-La máquina **Precious**, disponible en la plataforma **Hack The Box**, es un desafío basado en **Linux** que pone a prueba habilidades en la explotación de vulnerabilidades web, con un enfoque particular en la deserialización en Ruby. En este write-up, detallaremos cada paso del proceso, desde el escaneo inicial hasta la obtención de la flag de root.
+La máquina **Precious** evalúa la explotación de vulnerabilidades web, centrándose en la deserialización en Ruby. Este write-up cubre cada etapa, desde el escaneo hasta la obtención de la flag de root.
 
 ## Reconocimiento
 ---
