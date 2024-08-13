@@ -7,7 +7,7 @@ img_path: /assets/img/htb/precious/
 image: /assets/img/htb/precious/precious.png
 ---
 
-La máquina **Precious** evalúa la explotación de vulnerabilidades web, centrándose en la deserialización en Ruby. Este write-up cubre cada etapa, desde el escaneo hasta la obtención de la flag de root.
+Explotamos una vulnerabilidad en la conversión de URLs a PDF para inyectar comandos y obtener una Reverse Shell. Posteriormente, utilizamos un archivo de configuración para acceder a un usuario, desde el cual escalamos privilegios mediante una vulnerabilidad en un script Ruby para añadir permisos SUID a `/bin/bash`, logrando acceso root.
 
 ## Reconocimiento
 ---
@@ -349,7 +349,7 @@ bash-5.1# whoami
 root
 ```
 ---
-Por ultimo, leemos la flag de `root`.
+Por último, leemos la flag de `root`.
 
 ```bash
 bash-5.1# cat /root/root.txt 

