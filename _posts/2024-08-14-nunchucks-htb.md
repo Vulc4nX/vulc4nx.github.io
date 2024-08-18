@@ -93,7 +93,7 @@ Accedemos al subdominio `https://store.nunchucks.htb/` y nos encontramos con una
 
 ## Explotación
 ---
-Para confirmar la vulnerabilidad, intentamos ingresar una expresión sencilla de SSTI, como `{{77}}`. Si el sitio es vulnerable, esta entrada debería devolver el resultado de la operación, en este caso `49`.
+Para confirmar la vulnerabilidad, intentamos ingresar una expresión sencilla de SSTI, como `{\{7*7}\}`. Si el sitio es vulnerable, esta entrada debería devolver el resultado de la operación, en este caso `49`.
 
 ![nunchucks-5](/assets/img/htb/nunchucks/nunchucks-5.png)
 
@@ -134,7 +134,7 @@ Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
 Nos preparamos para recibir la conexión inversa por el puerto 443 utilizando `netcat`.
 
 ```bash
-nc -lvp 443
+nc -lvnp 443
 _______________________________________________________________________
 listening on [any] 443 ...
 ```
@@ -151,7 +151,7 @@ Seguido de esto, desde Burp Suite, enviamos un comando `curl` a la máquina víc
 La conexión se establece con éxito, y ganamos acceso a la máquina como el usuario `david`.
 
 ```bash
-nc -lvp 443
+nc -lvnp 443
 listening on [any] 443 ...
 _______________________________________________________________________
 connect to [10.10.16.3] from nunchucks.htb [10.10.11.122] 35982
